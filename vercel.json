@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    // Merutekan semua permintaan ke fungsi serverless (API)
+    {
+      "src": "/(.*)",
+      "dest": "index.js"
+    }
+  ]
+}
