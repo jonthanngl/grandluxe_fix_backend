@@ -1,0 +1,647 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+index.js
+package.json
+src/app.js
+src/config/db.js
+src/controllers/adminController.js
+src/controllers/authController.js
+src/controllers/bookingController.js
+src/controllers/roomController.js
+src/middleware/authMiddleware.js
+src/routes/admin.js
+src/routes/auth.js
+src/routes/booking.js
+src/routes/room.js
+src/services/authService.js
+src/services/bookingService.js
+src/services/roomService.js
+uploads/1764514909027.avif
+uploads/1764515201215.avif
+uploads/1764515589679.avif
+uploads/1764515880866.webp
+uploads/1764517260907.avif
+uploads/1764517417807.webp
+uploads/1764517598055.avif
+uploads/1764517770143.avif
+uploads/1764518069222.avif
+uploads/1764941140685.avif
+uploads/1764941291892.webp
+uploads/1764941383086.avif
+uploads/1764941439785.avif
+uploads/1764941543194.avif
+uploads/1764941619397.avif
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="index.js">
+// index.js
+const app = require('./src/app');
+const port = process.env.PORT || 5000;
+
+app.listen(port, () => {
+  console.log(`Server berjalan di http://localhost:${port}`);
+});
+</file>
+
+<file path="package.json">
+{
+"name": "grandluxe-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js", 
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "pg": "^8.16.3"
+  }
+}
+</file>
+
+<file path="src/app.js">
+// src/app.js
+const express = require('express');
+const cors = require('cors');
+const path = require('path'); // Wajib ada
+require('dotenv').config();
+
+// Import Routes
+const roomRoutes = require('./routes/room'); 
+const authRoutes = require('./routes/auth');
+const bookingRoutes = require('./routes/booking');
+const adminRoutes = require('./routes/admin');
+
+const app = express();
+
+// --- PERBAIKAN PENTING DI SINI ---
+// Gunakan process.cwd() agar backend mengambil folder 'uploads' dari Root Project
+// Bukan mencari di dalam folder src
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// ---------------------------------
+
+app.use(cors());
+app.use(express.json());
+
+// Gunakan Routes
+app.use('/api/rooms', roomRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/admin', adminRoutes);
+
+app.get('/', (req, res) => {
+    res.send('Backend Grand Luxe Jalan!');
+});
+
+module.exports = app;
+</file>
+
+<file path="src/config/db.js">
+const { Pool } = require('pg');
+require('dotenv').config();
+
+const poolConfig = {
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT,
+
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+};
+
+const pool = new Pool(poolConfig);
+
+pool.connect((err) => {
+    if (err) {
+        console.error('Koneksi database gagal:', err);
+    } else {
+        console.log('Berhasil terhubung ke Database PostgreSQL');
+    }
+});
+
+module.exports = pool;
+</file>
+
+<file path="src/controllers/adminController.js">
+// controllers/adminController.js
+const pool = require('../config/db');
+
+// 1. LIHAT SEMUA PESANAN (Dari semua user)
+const getAllBookings = async (req, res) => {
+    try {
+        // Kita join 3 tabel: bookings, users (biar tau nama tamu), rooms (biar tau tipe kamar)
+        const query = `
+            SELECT b.id, u.name as guest_name, u.email, r.type as room_type, 
+                   b.check_in, b.check_out, b.total_price, b.status
+            FROM bookings b
+            JOIN users u ON b.user_id = u.id
+            JOIN rooms r ON b.room_id = r.id
+            ORDER BY b.created_at DESC
+        `;
+        const result = await pool.query(query);
+        res.json({ success: true, data: result.rows });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// 2. UBAH STATUS PESANAN (Terima/Tolak/Selesai)
+const updateBookingStatus = async (req, res) => {
+    const { id } = req.params; // ID Booking dari URL
+    const { status } = req.body; // Status baru yang dikirim Admin
+
+    try {
+        const result = await pool.query(
+            'UPDATE bookings SET status = $1 WHERE id = $2 RETURNING *',
+            [status, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: "Pesanan tidak ditemukan" });
+        }
+
+        res.json({ success: true, message: "Status berhasil diperbarui", data: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = { getAllBookings, updateBookingStatus };
+</file>
+
+<file path="src/controllers/authController.js">
+// controllers/authController.js
+const authService = require('../services/authService');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const register = async (req, res) => {
+    try {
+        // Frontend kamu mengirim: name, email, phone, password
+        const newUser = await authService.registerUser(req.body);
+        
+        res.status(201).json({
+            success: true,
+            message: "Registrasi Berhasil! Silakan Login.",
+            data: { 
+                id: newUser.id, 
+                name: newUser.name, 
+                email: newUser.email 
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const user = await authService.findUserByEmail(email);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Email tidak ditemukan" });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ success: false, message: "Password salah" });
+        }
+
+        // Masukkan role & nama ke dalam token agar frontend bisa baca
+        const token = jwt.sign(
+            { id: user.id, role: user.role, name: user.name }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '1d' }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Login Berhasil",
+            token: token,
+            user: {
+                id: user.id,
+                name: user.name,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = { register, login };
+</file>
+
+<file path="src/controllers/bookingController.js">
+// controllers/bookingController.js
+const bookingService = require('../services/bookingService');
+
+const createBooking = async (req, res) => {
+    try {
+        // req.user.id didapat dari middleware (token)
+        const userId = req.user.id; 
+        const booking = await bookingService.createBooking(userId, req.body);
+        
+        res.status(201).json({
+            success: true,
+            message: "Pemesanan berhasil dibuat!",
+            data: booking
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+const getMyBookings = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const bookings = await bookingService.getUserBookings(userId);
+        
+        res.status(200).json({
+            success: true,
+            data: bookings
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = { createBooking, getMyBookings };
+</file>
+
+<file path="src/controllers/roomController.js">
+// controllers/roomController.js
+const roomService = require('../services/roomService');
+
+// GET ALL ROOMS
+const getRooms = async (req, res) => {
+    try {
+        const rooms = await roomService.getAllRooms();
+        res.status(200).json({ success: true, data: rooms });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// ADD ROOM (UPDATED: SUPPORT FOTO)
+const addRoom = async (req, res) => {
+    try {
+        // --- PERUBAHAN DIMULAI DI SINI ---
+        // Ganti URL lokal dengan variabel lingkungan BASE_URL
+        const BASE_URL = process.env.BASE_URL; 
+        
+        // 1. Cek apakah ada file yang diupload lewat Multer?
+        // Kalau ada, buat URL-nya menggunakan BASE_URL.
+       const imagePath = req.file ? `${BASE_URL}/uploads/${req.file.filename}` : null
+        // --- PERUBAHAN SELESAI DI SINI ---
+
+        // 2. Gabungkan data teks (dari req.body) dengan link gambar
+        const roomData = {
+            ...req.body,
+            image_url: imagePath // Tambahkan properti ini agar disimpan service
+        };
+
+        // 3. Kirim data lengkap ke Service
+        const newRoom = await roomService.createRoom(roomData);
+        
+        res.status(201).json({
+            success: true,
+            message: "Kamar berhasil ditambahkan dengan FOTO!",
+            data: newRoom
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// DELETE ROOM
+const deleteRoom = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const deletedRoom = await roomService.deleteRoomById(id); 
+
+        if (!deletedRoom) {
+            return res.status(404).json({ success: false, message: "Kamar tidak ditemukan" });
+        }
+
+        res.status(200).json({ success: true, message: "Kamar berhasil dihapus" });
+    } catch (error) {
+        if (error.code === '23503') {
+            return res.status(400).json({ success: false, message: "Gagal hapus! Kamar ini masih ada dalam data pemesanan." });
+        }
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// EDIT ROOM
+const editRoom = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updatedRoom = await roomService.updateRoomById(id, req.body);
+
+        if (!updatedRoom) {
+            return res.status(404).json({ success: false, message: "Kamar tidak ditemukan" });
+        }
+
+        res.status(200).json({ success: true, message: "Kamar berhasil diupdate", data: updatedRoom });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = {
+    getRooms,
+    addRoom,
+    deleteRoom,
+    editRoom
+};
+</file>
+
+<file path="src/middleware/authMiddleware.js">
+// middleware/authMiddleware.js
+const jwt = require('jsonwebtoken');
+
+const verifyToken = (req, res, next) => {
+    // 1. Ambil token dari header (Authorization: Bearer <token>)
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ success: false, message: "Akses ditolak! Anda belum login." });
+    }
+
+    try {
+        // 2. Cek keaslian token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        
+        // 3. Simpan data user (id, role) ke dalam request supaya bisa dipakai di controller
+        req.user = decoded; 
+        next(); // Lanjut ke controller
+    } catch (error) {
+        return res.status(403).json({ success: false, message: "Token tidak valid!" });
+    }
+};
+
+module.exports = verifyToken;
+</file>
+
+<file path="src/routes/admin.js">
+// routes/admin.js
+const express = require('express');
+const router = express.Router();
+const verifyToken = require('../middleware/authMiddleware');
+const adminController = require('../controllers/adminController');
+
+// Middleware Khusus Admin (Cek Role)
+const verifyAdmin = (req, res, next) => {
+    // req.user didapat dari verifyToken sebelumnya
+    if (req.user.role !== 'Admin') {
+        return res.status(403).json({ success: false, message: "Akses Ditolak! Khusus Admin." });
+    }
+    next();
+};
+
+// Route: Lihat Semua Pesanan
+// Urutannya: Cek Token -> Cek Apakah Admin -> Baru jalankan Controller
+router.get('/bookings', verifyToken, verifyAdmin, adminController.getAllBookings);
+
+// Route: Update Status Pesanan (Pakai ID di URL)
+router.put('/bookings/:id', verifyToken, verifyAdmin, adminController.updateBookingStatus);
+
+module.exports = router;
+</file>
+
+<file path="src/routes/auth.js">
+// routes/auth.js
+const express = require('express');
+const router = express.Router();
+const authController = require('../controllers/authController');
+
+router.post('/register', authController.register);
+router.post('/login', authController.login);
+
+module.exports = router;
+</file>
+
+<file path="src/routes/booking.js">
+// routes/booking.js
+const express = require('express');
+const router = express.Router();
+const bookingController = require('../controllers/bookingController');
+const verifyToken = require('../middleware/authMiddleware');
+
+// Pastikan verifyToken dan bookingController tidak undefined/error
+router.post('/', verifyToken, bookingController.createBooking);
+router.get('/my', verifyToken, bookingController.getMyBookings);
+
+// --- BAGIAN INI WAJIB ADA ---
+module.exports = router;
+</file>
+
+<file path="src/routes/room.js">
+// src/routes/room.js
+const express = require('express');
+const router = express.Router();
+const roomController = require('../controllers/roomController');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs'); // <--- Tambahan Wajib
+
+// Konfigurasi Penyimpanan Pintar
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        // Tentukan folder uploads di Root Project
+        const dir = path.join(process.cwd(), 'uploads');
+
+        // Cek: Kalau folder belum ada, buat dulu!
+        if (!fs.existsSync(dir)){
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        // Nama file unik: DetikSaatIni + EkstensiAsli
+        cb(null, Date.now() + path.extname(file.originalname)); 
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// Definisi Route
+router.get('/', roomController.getRooms);
+// Tambahkan middleware upload.single('image') di sini
+router.post('/', upload.single('image'), roomController.addRoom);
+router.delete('/:id', roomController.deleteRoom);
+router.put('/:id', roomController.editRoom);
+
+module.exports = router;
+</file>
+
+<file path="src/services/authService.js">
+// services/authService.js
+const pool = require('../config/db');
+const bcrypt = require('bcryptjs');
+
+const registerUser = async (userData) => {
+    const { name, email, phone, password } = userData;
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Default role adalah 'user'
+    const result = await pool.query(
+        'INSERT INTO users (name, email, phone, password, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [name, email, phone, hashedPassword, 'user']
+    );
+    return result.rows[0];
+};
+
+const findUserByEmail = async (email) => {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    return result.rows[0];
+};
+
+module.exports = { registerUser, findUserByEmail };
+</file>
+
+<file path="src/services/bookingService.js">
+// services/bookingService.js
+const pool = require('../config/db');
+
+// Fungsi: User membuat pesanan baru
+const createBooking = async (userId, bookingData) => {
+    const { room_id, check_in, check_out, total_price } = bookingData;
+    
+    // Simpan ke tabel bookings
+    const result = await pool.query(
+        `INSERT INTO bookings (user_id, room_id, check_in, check_out, total_price, status) 
+         VALUES ($1, $2, $3, $4, $5, 'Pending') RETURNING *`,
+        [userId, room_id, check_in, check_out, total_price]
+    );
+    return result.rows[0];
+};
+
+// Fungsi: User melihat pesanan miliknya sendiri
+const getUserBookings = async (userId) => {
+    // Kita join dengan tabel rooms supaya dapat nama kamarnya juga
+    const query = `
+        SELECT b.id, b.check_in, b.check_out, b.total_price, b.status, r.type as room_type, r.image_url
+        FROM bookings b
+        JOIN rooms r ON b.room_id = r.id
+        WHERE b.user_id = $1
+        ORDER BY b.created_at DESC
+    `;
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+};
+
+module.exports = { createBooking, getUserBookings };
+</file>
+
+<file path="src/services/roomService.js">
+// src/services/roomService.js
+const pool = require('../config/db');
+
+const getAllRooms = async () => {
+    const result = await pool.query('SELECT * FROM rooms ORDER BY id ASC');
+    return result.rows;
+};
+
+// --- BAGIAN INI YANG SALAH SEBELUMNYA ---
+const createRoom = async (roomData) => {
+    // Tambahkan 'image_url' di sini supaya ditangkap
+    const { type, price, description, facilities, status, image_url } = roomData;
+    
+    const result = await pool.query(
+        // Tambahkan kolom image_url ke dalam Query SQL ($6)
+        'INSERT INTO rooms (type, price, description, facilities, status, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [type, price, description, facilities, status, image_url]
+    );
+    return result.rows[0];
+};
+// -----------------------------------------
+
+const deleteRoomById = async (id) => {
+    const result = await pool.query('DELETE FROM rooms WHERE id = $1 RETURNING *', [id]);
+    return result.rows[0];
+};
+
+const updateRoomById = async (id, roomData) => {
+    const { type, price, description, facilities, status } = roomData;
+    
+    // Note: Update gambar belum kita buat di frontend, jadi sementara ini update data teks dulu
+    const result = await pool.query(
+        `UPDATE rooms 
+         SET type = $1, price = $2, description = $3, facilities = $4, status = $5 
+         WHERE id = $6 RETURNING *`,
+        [type, price, description, facilities, status, id]
+    );
+    return result.rows[0];
+};
+
+module.exports = {
+    getAllRooms,
+    createRoom,
+    deleteRoomById,
+    updateRoomById
+};
+</file>
+
+</files>
