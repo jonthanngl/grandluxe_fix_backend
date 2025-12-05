@@ -7,7 +7,6 @@
     }
   ],
   "routes": [
-    // Merutekan semua permintaan ke fungsi serverless (API)
     {
       "src": "/(.*)",
       "dest": "index.js"
